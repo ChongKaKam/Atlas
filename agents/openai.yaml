@@ -1,0 +1,6 @@
+interface:
+  display_name: "Atlas"
+  short_description: "Curate and audit local Markdown knowledge bases"
+  default_prompt: "Use $atlas to inspect my Markdown knowledge base and carry out the requested curation with sources and reviewable changes."
+policy:
+  allow_implicit_invocation: true
