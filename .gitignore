@@ -28,6 +28,7 @@ htmlcov/
 !.env.example
 /local/
 /scratch/
+/.atlas/config.json
 *.log
 
 # Editor temporary files

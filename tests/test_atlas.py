@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 MODULE = Path(__file__).resolve().parents[1] / "scripts" / "atlas.py"
+sys.path.insert(0, str(MODULE.parent))
 spec = importlib.util.spec_from_file_location("atlas", MODULE)
 atlas = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = atlas

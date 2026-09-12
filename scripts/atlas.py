@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sys
 from urllib.parse import unquote, urlsplit, quote
+from atlas_layout import read_layout
 
 try:
     import yaml
@@ -79,9 +80,13 @@ class KnowledgeBase:
             raise ValueError("knowledge-base root must be a directory")
         self.findings = []
         self.docs = []
+        self.layout = read_layout(self.root)
         for path in self.inventory():
             relative = path.relative_to(self.root).as_posix()
-            curated = relative.split("/")[0] in {"knowledge", "projects"}
+            parts = relative.split("/")
+            curated = parts[0] in self.layout["scopes"]
+            if self.layout["version"] == 2 and len(parts) == 2 and parts[1] in CONTROLS:
+                curated = False
             try:
                 text = path.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeError) as exc:
@@ -118,7 +123,11 @@ class KnowledgeBase:
                 self.add("warning", "symlink", name, 1, "symlink not read")
             elif path.is_file():
                 paths.append(path)
-        for name in ("knowledge", "projects"):
+        if self.layout["version"] == 2:
+            for child in sorted(self.root.iterdir()):
+                if child.is_dir() and not child.name.startswith(".") and child.name != "assets" and child.name not in self.layout["scopes"]:
+                    self.add("warning", "unregistered-scope", child.name, 1, "directory not registered; Markdown inside was not inspected")
+        for name in sorted(self.layout["scopes"]):
             base = self.root / name
             if base.is_symlink():
                 self.add("warning", "symlink", name, 1, "symlink tree not read")
@@ -129,6 +138,8 @@ class KnowledgeBase:
             def walk_error(exc):
                 self.add("error", "read", str(exc.filename), 1, str(exc))
             if not base.exists():
+                if self.layout["version"] == 2:
+                    self.add("error", "layout", name, 1, "registered scope directory missing")
                 continue
             for folder, dirs, files in os.walk(base, followlinks=False, onerror=walk_error):
                 for child in list(dirs):
@@ -137,6 +148,7 @@ class KnowledgeBase:
                         self.add("warning", "symlink", p.relative_to(self.root).as_posix(), 1,
                                  "symlink tree not read")
                 dirs[:] = sorted(d for d in dirs if not d.startswith(".")
+                                 and (self.layout["version"] != 2 or d != "assets")
                                  and not (Path(folder) / d).is_symlink())
                 for filename in sorted(files):
                     p = Path(folder) / filename
@@ -279,8 +291,11 @@ class KnowledgeBase:
                         continue
                     if not target.exists():
                         self.add("error", "broken-link", doc.relative, line, dest)
-                    elif target in inbound and target != doc.path and doc.relative != "INDEX.md":
-                        inbound[target].add(doc.path)
+                    elif target in inbound and target != doc.path:
+                        scope_index = (self.layout["version"] == 2 and len(Path(doc.relative).parts) == 2
+                                       and doc.path.name == "INDEX.md")
+                        if doc.relative != "INDEX.md" and not scope_index:
+                            inbound[target].add(doc.path)
                     if url.fragment:
                         self.add("info", "anchor-unchecked", doc.relative, line,
                                  f"target path checked, heading anchor requires review: {dest}")
@@ -303,7 +318,7 @@ class KnowledgeBase:
         for doc in self.docs:
             if not doc.curated:
                 continue
-            group = "/".join(doc.relative.split("/")[:2])
+            group = "/".join(doc.relative.split("/")[:1 if self.layout["version"] == 2 else 2])
             if group != previous:
                 if previous is not None:
                     lines.append("")
@@ -317,7 +332,7 @@ class KnowledgeBase:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["validate", "check-links", "audit", "build-index"])
-    parser.add_argument("root", help="explicit knowledge-base root, not the Skill directory")
+    parser.add_argument("root", nargs="?", help="KB root; omit to use project/environment/global configuration")
     parser.add_argument("--json", action="store_true", help="machine-readable diagnostic output")
     parser.add_argument("--strict", action="store_true", help="warnings also cause exit 1")
     parser.add_argument("--check", action="store_true", help="build-index only: compare existing INDEX.md without writing")
@@ -327,6 +342,9 @@ def main(argv=None):
     if args.json and args.command == "build-index" and not args.check:
         parser.error("build-index emits Markdown; use --check with --json for diagnostics")
     try:
+        if args.root is None:
+            from atlas_user import resolve_kb
+            args.root = resolve_kb()["root"]
         kb = KnowledgeBase(args.root)
         if args.command == "build-index":
             kb.validate()
@@ -345,12 +363,13 @@ def main(argv=None):
             kb.check_links()
         else:
             kb.audit()
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"Atlas input error: {exc}", file=sys.stderr)
         return 2
     findings = sorted(kb.findings, key=lambda f: (f.path, f.line, f.code))
     if args.json:
-        print(json.dumps({"root": str(kb.root), "findings": [asdict(f) for f in findings],
+        print(json.dumps({"root": str(kb.root), "layout": kb.layout, "documents": len(kb.docs),
+                          "findings": [asdict(f) for f in findings],
                           "errors": sum(f.severity == "error" for f in findings),
                           "warnings": sum(f.severity == "warning" for f in findings)}, ensure_ascii=False, indent=2))
     else:

@@ -1,10 +1,10 @@
-# Atlas Knowledge Base Specification v0.2
+# Atlas Knowledge Base Specification v0.3
 
 > Status: working specification for Atlas V1; defaults remain subject to real-use review  
 > Scope: the structure and curation rules of an Atlas-managed Markdown knowledge base  
-> Last updated: 2026-09-09
+> Last updated: 2026-09-12
 
-This document defines the knowledge contract for Atlas. V0.2 retains the initial KU model, six document types, and three statuses, and clarifies operational defaults following the user's request to build the complete Skill. Workflows and tools are specified separately in [SKILL.md](../SKILL.md) and [tooling](tooling.md). QMD and Obsidian remain optional future enhancements, not V1 dependencies. Initial pilot observations are limited self-review evidence, not an independent validation of these rules.
+This document defines the knowledge contract for Atlas. V0.3 retains the KU model, six document types and three statuses, and introduces scope-first layout v2, mandatory shared integration review, and extensible Knowledge Capture. Workflows and tools are specified separately in [SKILL.md](../SKILL.md) and [tooling](tooling.md). QMD and Obsidian remain optional future enhancements, not V1 dependencies. Initial pilot observations are limited self-review evidence, not an independent validation of these rules.
 
 ## 1. Design Goals
 
@@ -23,7 +23,7 @@ The knowledge base is not intended to preserve every input document as-is. It pr
 
 ## 2. Atlas Decision Principles
 
-Preservation of evidence, explicit conflict handling, and user authorization are constraints. Among the other principles, explain trade-offs in the integration plan: reducing duplication must not override clear knowledge boundaries. Review-first means concrete, reviewable changes; an already authorized change does not require repeated approval. See [Review and Apply](review-apply.md).
+Preservation of evidence, explicit conflict handling, and user authorization are constraints. Among the other principles, explain trade-offs in the integration plan: reducing duplication must not override clear knowledge boundaries. Review-first means concrete, reviewable changes; an already authorized change does not require repeated approval. See [Review and Apply](review-apply.md). Shared integration is an explicit exception: review the concrete proposed content before any shared write. Content capture follows [Knowledge Capture](../assets/knowledge-capture-prompt.md): completeness > accuracy > traceability > structure > brevity; completeness never authorizes fabrication.
 
 1. **Preserve meaning, evidence, and context.** Preserve useful knowledge, not necessarily the original wording or input-document boundary.
 2. **Never silently resolve uncertainty or disagreement.** Qualify claims, retain relevant competing evidence, and request review when the evidence does not support a clear resolution.
@@ -41,57 +41,38 @@ These principles refine the initial candidates in three ways: “preserve knowle
 
 ## 3. Directory Structure
 
-### 3.1 Recommended shape
+### 3.1 Scope-first layout (v2)
 
-Use a shallow, domain-first structure:
+The outermost directories are user-selected projects or domains, plus one `shared` scope:
 
 ```text
 knowledge-base/
 ├── README.md
 ├── CONVENTIONS.md
-├── knowledge/
-│   ├── compiler/
-│   ├── ai-compiler/
-│   ├── llvm/
-│   ├── mlir/
-│   ├── isa/
-│   ├── hardware/
-│   ├── runtime/
-│   ├── heterogeneous-programming/
-│   └── programming-model/
-├── projects/
-│   └── <project-name>/
-└── assets/                    # optional; only when Markdown needs local supporting media
-    └── <document-slug>/
+├── .atlas/
+│   ├── layout.json
+│   └── capture-profiles/       # optional user-selected scenario extensions
+├── compiler-x/                # project
+├── llvm/                      # domain
+├── mlir/                      # domain
+└── shared/                    # shared knowledge, content-reviewed before integration
 ```
 
-`knowledge/` contains reusable, curated technical knowledge. `projects/` contains context-bound working knowledge whose meaning depends on a particular project, implementation, or local decision. A project note that becomes generally useful should be promoted into `knowledge/` and replaced with a link rather than copied indefinitely.
+New initialization registers only an empty shared scope. Create project/domain directories when the user chooses them. The versioned registry `.atlas/layout.json` distinguishes project/domain/shared ownership and defines the scanner boundary; it is configuration, not a second knowledge store. Full schema, commands, selection procedure and legacy migration rules: [Scopes and shared review](scopes.md).
 
-The domain list is an initial vocabulary, not a requirement to create nine empty directories. Create a directory only when the first document needs it. Phase 2 should test whether `ai-compiler/` and `programming-model/` remain useful primary homes or are better represented through other domains and tags.
+### 3.2 Ownership and sharing
 
-`assets/` may hold diagrams or other supporting files, but assets are not an alternative knowledge store. Important claims, captions, and interpretation remain in Markdown.
+Directories answer “Which project/domain owns this knowledge?” Types answer “How should this document be read?” Use `llvm/SelectionDAG-legalization.md`, not `concepts/llvm/...`. Project-local notes live directly in their chosen project scope, such as `compiler-x/Benchmark.md`.
 
-### 3.2 Domain-first, not type-first
+At ADD/INTEGRATE, ask the user to choose an existing project/domain or name a new scope unless their selection is already explicit for this request/batch. Searching other scopes does not authorize writing there. Cross-domain relationships can be links; general usefulness does not automatically make a document shared.
 
-Directories answer **“Which body of knowledge primarily owns this document?”** Document metadata answers **“How should this document be read?”** Therefore:
+**Every integration into shared requires the user's review of the concrete content/diff before writing.** This includes new shared notes, extensions, corrections, merges and promotions from other scopes. Choosing shared or granting general Apply permission is not content review. Before approval, preserve the original notes and keep proposals outside canonical shared content. Record the real approved scope/date in the shared document body after approval; do not infer technical `reviewed` status merely from routing approval.
 
-- Use `knowledge/llvm/SelectionDAG-legalization.md`, not `concepts/llvm/...`.
-- Do not create parallel roots such as `concepts/`, `guides/`, and `experiments/`; one topic would otherwise be fragmented across type trees.
-- Give a cross-domain document one primary home based on its main question, then represent the other domains with links and, when useful, tags.
+### 3.3 Depth and compatibility
 
-Examples:
+Keep files directly under a scope by default, adding subject subdirectories only when real clusters justify them. Do not encode status, year, source or document type in directory trees. Supporting media may live in `assets/` under the KB or a scope, with claims and interpretation retained in Markdown.
 
-- An explanation of how LLVM implements RISC-V register pairs belongs under `llvm/`; `risc-v` may be a tag and the ISA rule may be linked.
-- A description of the architectural register-pair constraint belongs under `isa/`, even if LLVM source code motivated the investigation.
-- An explanation of the LLVM dialect belongs under `mlir/`; its name does not make it an `llvm/` document.
-
-### 3.3 Depth rules
-
-- Default to files directly within a domain.
-- Add one subdomain level only after a real cluster is hard to browse or has a distinct ownership boundary, for example `llvm/codegen/`.
-- Avoid more than two levels below `knowledge/` (`domain/subdomain/file.md`) unless Phase 2 demonstrates a concrete need.
-- Do not create generic catch-all directories such as `misc/`, `notes/`, or `cross-domain/`. If ownership is unclear, treat that as an integration decision, not a folder name.
-- Do not use directories to encode status, year, source type, or document type.
+Legacy libraries without a layout registry remain readable under `knowledge/<domain>/` and `projects/<project>/`. Do not silently migrate on Skill update, create a registry that hides existing files, or equate all old knowledge with shared. Propose a complete old/new path mapping and link repairs before any migration; any shared destination still requires content review.
 
 ## 4. Knowledge Unit Model
 
@@ -163,7 +144,7 @@ Use six types. They describe the document’s dominant reader intent, not every 
 Changes to the initial candidates:
 
 - `experiment` and retrospective `debugging` records become `investigation`; both require reproducible context, observations, and evidence. A reusable debugging procedure is a `guide`.
-- `project-note` is not a document type. Project scope is a location and lifecycle (`projects/<project-name>/`), while the note’s reader intent still maps to one of the six types. Informal scratch notes are outside the curated schema until integrated.
+- `project-note` is not a document type. Project scope is a location and lifecycle (`<project-scope>/`), while the note’s reader intent still maps to one of the six types. Informal scratch notes are outside the curated schema until integrated.
 
 If a document appears to need two types, choose the dominant reader promise or split it. Do not add subtypes in v0.1; use headings and a small number of tags for meaningful secondary facets.
 
@@ -279,7 +260,7 @@ Stable naming and shallow directories reduce link churn. A future tool may autom
 - **Tags:** cross-cutting technical facets that improve retrieval across domains.
 - **Links:** specific semantic relationships between documents.
 
-Do not repeat directory and type mechanically as tags. For example, a file under `knowledge/llvm/` with `type: concept` does not automatically need `llvm` or `concept` tags.
+Do not repeat directory and type mechanically as tags. For example, a file under `llvm/` with `type: concept` does not automatically need `llvm` or `concept` tags.
 
 ### 9.2 Syntax and vocabulary
 
@@ -341,7 +322,7 @@ When a document contains externally derived, experimental, or non-obvious claims
 
 - **Official documentation:** [GlobalISel — LLVM documentation](https://llvm.org/docs/GlobalISel/), accessed 2026-09-09; basis for the pipeline overview.
 - **Source code:** `llvm/lib/CodeGen/GlobalISel/Legalizer.cpp` at tag `llvmorg-21.1.0`; implementation behavior discussed in “Action selection.”
-- **Experiment:** [Minimal legalization reproducer](../../projects/legalizer-study/reproducer.md), run on LLVM 21.1.0 for `riscv64`.
+- **Experiment:** [Minimal legalization reproducer](../legalizer-study/reproducer.md), run on LLVM 21.1.0 for `riscv64`.
 - **Personal inference:** The ordering explanation combines the source-code path and the experiment; it is not stated directly in the documentation.
 - **AI-assisted synthesis:** Initial comparison drafted with AI, then checked against the sources above. Unverified portions remain marked in the text.
 ```
@@ -360,6 +341,8 @@ Recommended provenance kinds are:
 These are labels in prose, not mandatory schema values in v0.1. Use a direct link, document identifier, repository path plus revision, experiment link plus conditions, or other locator appropriate to the source. Record an access date for mutable web pages and a version/commit for version-sensitive code or manuals when available.
 
 ### 11.3 Claim-level qualification
+
+Use [Fact], [Claim], [Inference], [Assumption] and [Unknown] for important content as defined in the Knowledge Capture template. A source asserting a claim proves that it asserted it, not that the underlying claim is universally true. Important KUs should preserve at least two of Context/Mechanism/Conditions/Relationships/Evidence when available; mark missing dimensions Unknown rather than inventing them.
 
 Do not annotate every sentence. Add local wording such as “the manual states,” “observed on,” or “inferred from” when:
 
@@ -418,7 +401,7 @@ Use the smallest stable set:
 
 | File | v0.1 decision | Purpose |
 |---|---|---|
-| `README.md` | Required in an actual knowledge base | Explain scope, top-level navigation, how to start, and the distinction between `knowledge/` and `projects/`. Keep it short. |
+| `README.md` | Required in an actual knowledge base | Explain scope, top-level navigation, how to start, and the project/domain scope choices and the mandatory shared review boundary. Keep it short. |
 | `CONVENTIONS.md` | Required in an actual knowledge base | Hold contributor-facing rules that Atlas and humans must follow: types, metadata, naming, linking, tags, status, and source format. It may summarize this specification rather than duplicate its rationale. |
 | `INDEX.md` | Deferred | Add only when repository scale makes a generated or curated index demonstrably useful. If generated, label it as derived and never edit it as the source of truth. |
 | `TAGS.md` | Deferred | Keep the small vocabulary in `CONVENTIONS.md`; split it out only when definitions and aliases become substantial. |
@@ -439,9 +422,9 @@ Suppose an imported conference note contains:
 These are three candidate KUs. A likely integration is:
 
 ```text
-knowledge/llvm/GPRPair.md                         concept; merge or create
-knowledge/llvm/debug-GlobalISel-legalization.md   guide; create or extend
-projects/legalizer-study/benchmark-results.md     investigation; preserve exact setup
+llvm/GPRPair.md                         concept; merge or create
+llvm/debug-GlobalISel-legalization.md   guide; create or extend
+legalizer-study/benchmark-results.md     investigation; preserve exact setup
 ```
 
 The input note itself need not become a fourth canonical knowledge document. Its source location may be recorded in the relevant `Sources and evidence` sections.
@@ -523,7 +506,7 @@ These are deliberately unresolved until Phase 2 supplies evidence:
 1. **Domain vocabulary:** Do `ai-compiler/` and `programming-model/` accumulate enough independently owned knowledge to remain top-level domains, or do they mostly act as cross-cutting tags and overview documents?
 2. **Subdomain threshold:** Which real LLVM/MLIR collections become hard to browse flat, and does one subdomain level solve the problem without encouraging premature taxonomy?
 3. **Investigation type:** Does one `investigation` type serve both controlled experiments and debugging case reports, or do their repeated structures and retrieval intents diverge in practice?
-4. **Project boundary:** Should `projects/` live in the same repository as reusable knowledge for all use cases, or should Atlas also support linking to separate project repositories?
+4. **Project boundary:** When should a project use its own KB root versus a project scope in the global KB? Explicit root overrides are supported; cross-root link durability still needs real-use validation.
 5. **Alias value:** Do aliases materially improve retrieval enough to justify maintaining them, especially after QMD is evaluated?
 6. **Provenance syntax:** Is the prose-based `Sources and evidence` format consistent enough across manuals, papers, source code, and experiments, or is a small optional convention needed?
 7. **Filename casing:** Does preserving identifier case create friction in real cross-platform Git workflows that outweighs its readability benefit?

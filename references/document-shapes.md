@@ -2,6 +2,8 @@
 
 这些是选择正文结构的提示，不是强制所有文件填写的字段。小 KU 可以只用两三节。保留上游 identifier；默认中文解释，已有库语言优先。Frontmatter schema 见 [规范](knowledge-base-spec.md)。
 
+正文内容遵循 [通用 Knowledge Capture prompt](../assets/knowledge-capture-prompt.md)：结构可裁剪，重要过程、条件、参数和证据不可为了简洁而删去。完整记录可从 [正文模板](../assets/knowledge-record.md) 开始，场景要求作为增量叠加。
+
 | Type | 读者问题 | 有用的正文顺序 |
 |---|---|---|
 | concept | 是什么、为什么 | 核心解释 → 范围/不变量 → 机制和例子 → 限制 → 来源 |

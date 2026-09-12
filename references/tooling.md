@@ -1,6 +1,6 @@
 # Atlas deterministic tools
 
-工具只读本地知识库，不作语义合并、技术纠错、网络请求、自动删除或 Git 操作。`build-index` 也只输出 Markdown 到 stdout，由调用者审阅后按现有写入授权保存。
+本页的 `atlas.py` 工具只读本地知识库，不作语义合并、技术纠错、网络请求、自动删除或 Git 操作。`build-index` 也只输出 Markdown 到 stdout，由调用者审阅后按现有写入授权保存。另有可写配置与更新 Skill 的 `atlas_user.py`，边界见 [用户配置与升级](user-management.md)。
 
 ## 环境
 
@@ -17,6 +17,8 @@ python3 -m venv /path/to/atlas-venv
 不覆盖已有虚拟环境，不自动改系统 Python。安装失败时报告缺失依赖；可继续语义工作、用 `rg` 搜索 inbound links 和人工检查 metadata，明确未执行的自动检查。
 
 ## 命令
+
+知识库位置参数可以省略，此时按项目配置、环境变量、全局配置解析（见用户配置说明）；从用户项目工作目录执行，不要为了调用脚本先切到 Skill 目录。配置失效直接报错。显式路径仍兼容原有命令。
 
 ```sh
 python /path/to/atlas/scripts/atlas.py validate /path/to/kb
@@ -36,8 +38,8 @@ python /path/to/atlas/scripts/atlas.py build-index /path/to/kb --check
 
 ## 范围与局限
 
-- 元数据规则只用于 `knowledge/**/*.md` 和 `projects/**/*.md`，包括其草稿。根 `README.md`、`CONVENTIONS.md`、可选 `TAGS.md`、`INDEX.md` 只参与链接/词表检查。
-- 未知 scratch/inbox、隐藏目录、实验开发目录不在扫描范围；源码/非 Markdown assets 只作为链接目标。范围不是“全磁盘扫描”。
+- layout v2 按 `.atlas/layout.json` 扫描注册的项目、领域与 shared 中的 Markdown（包括草稿）；无注册表的旧库仍扫描 `knowledge/**/*.md` 和 `projects/**/*.md`。JSON 输出包含识别的 layout，非法/未知版本不静默回退。根控制文件和 v2 分区根 README/CONVENTIONS/TAGS/INDEX 不要求知识元数据。词表来自 KB 根控制文件。
+- v2 未注册的顶层目录给出 `unregistered-scope` 警告，不扫描正文；注册但缺失的目录报错。隐藏目录、场景 profile 及 assets 目录不当作知识扫描。旧库只扫描 legacy 范围；源码/非 Markdown assets 只作为链接目标。范围不是“全磁盘扫描”。
 - Symlink 文件和目录不读取；指向库外的相对链接标为 warning，不检查其目标。库内指向 symlink 且解析到库外也作此处理。
 - Heading anchors 只提示 `anchor-unchecked`（info），不伪装成已验证；移动或改标题时必须人工确认 renderer 的 anchor 规则。HTML links 提示未检查。未定义的 Markdown reference 可能被 CommonMark 当普通文本，不报告为 broken link，需人工检查。
 - 不验证远程 URL 存活、来源可靠性、技术真伪、人类是否审查过、同义 tag、语义重复或孤立文档的价值。

@@ -16,8 +16,10 @@ Atlas 帮助你长期整理、检索和维护技术知识库，适合 LLVM、MLI
 | UPDATE | 根据证据修订知识，保留版本和上下文差异 |
 | ORGANIZE | 整理知识边界、移动文件并修复关联链接 |
 | AUDIT | 检查结构、链接、标签、来源和知识边界 |
+| INIT / CONFIG | 设置全局默认知识库和项目级覆盖 |
+| SELF-UPDATE | 安全快进更新 Skill，检查当前知识库兼容性 |
 
-Markdown 是知识的权威载体。语义决策由 agent 完成，Python 工具处理确定性检查。工具默认只读；索引也先输出供审阅。QMD、Obsidian 和数据库均不是必需依赖。
+Markdown 是知识的权威载体。语义决策由 agent 完成，Python 工具处理确定性检查。知识检查只读；索引也先输出供审阅。配置与 Skill 升级由单独的管理命令完成。QMD、Obsidian 和数据库均不是必需依赖。
 
 ## 安装
 
@@ -59,31 +61,50 @@ python3 -m venv "$HOME/.local/share/atlas/venv"
 
 ### 更新
 
-Git 安装可在检查本地改动后更新：
+Git 安装使用管理工具检查和更新；下面的 Python 是前述虚拟环境解释器：
 
 ```sh
-git -C "$HOME/.agents/skills/atlas" status --short
-git -C "$HOME/.agents/skills/atlas" pull --ff-only
+"$HOME/.local/share/atlas/venv/bin/python" "$HOME/.agents/skills/atlas/scripts/atlas_user.py" update --check
+"$HOME/.local/share/atlas/venv/bin/python" "$HOME/.agents/skills/atlas/scripts/atlas_user.py" update
 ```
 
-依赖文件变化时，在原虚拟环境重新执行依赖安装。个人知识库应保存在 Skill 目录之外，不随 Skill 更新而移动。
+从你的项目目录执行，或加 `--cwd /absolute/path/to/Project`。**`update` 默认从已配置的 GitHub upstream 执行 `git pull --ff-only`；`--check` 仅预检查**，旧 `--apply` 仍兼容。本地改动、分叉等会阻止更新。输出版本、文件差异、依赖变化、升级前后审计差异及本地布局/profile 信息；Agent 随后核对新版工作流与场景要求。不会上传、迁移或修改知识库，冲突的本地定制需单独审阅。依赖变化需在原虚拟环境重新安装。ZIP 安装不支持 git 自更新。详见 [配置与升级](references/user-management.md)。
 
 ## 开始使用
 
 安装后，在支持 Skill 提及的 Codex 界面中选择 Atlas，或显式要求它按 Atlas 执行；CLI / IDE 可用 `$atlas`。
 
-先选定一个独立知识库路径。例如：
+首次初始化会请你指定一个独立的全局知识库路径。例如：
 
 ```text
-使用 Atlas，在 /absolute/path/to/KnowledgeBase 创建技术知识库。
+使用 Atlas，初始化全局知识库到 /absolute/path/to/KnowledgeBase，这是一个新目录。
 默认中文解释，保留英文技术术语。按实际需要创建领域目录。
 ```
 
-整合文档：
+也可手动配置（已有知识库省略 `--create`）：
+
+```sh
+python3 "$HOME/.agents/skills/atlas/scripts/atlas_user.py" init \
+  --kb /absolute/path/to/KnowledgeBase --create
+```
+
+默认保存到 `~/.config/atlas/config.json`，支持 `XDG_CONFIG_HOME`。也可用 `export ATLAS_KB_ROOT="/absolute/path/to/KnowledgeBase"`；桌面应用推荐使用持久配置，避免环境变量未继承。
+
+需要项目专用知识库时：
+
+```sh
+python3 "$HOME/.agents/skills/atlas/scripts/atlas_user.py" init \
+  --project /absolute/path/to/Project --kb /absolute/path/to/Project/knowledge --create
+python3 "$HOME/.agents/skills/atlas/scripts/atlas_user.py" resolve --cwd /absolute/path/to/Project
+```
+
+优先级：**本次显式路径 > 最近项目 `.atlas/config.json` > `ATLAS_KB_ROOT` > 全局配置**。命中的配置失效会报错，不会悄悄操作另一个库。配置完成后无需每次提供路径，例如「使用 Atlas，查询默认知识库中的 LLVM dialect 笔记」。
+
+整合文档（仍可显式选择其他库）：
 
 ```text
 使用 Atlas，将 /absolute/path/to/notes/input.md 整合进
-/absolute/path/to/KnowledgeBase。
+/absolute/path/to/KnowledgeBase 的 llvm 领域。
 先检索已有知识，给出整合计划、正文草案与 diff，等我确认后写入。
 ```
 
@@ -101,7 +122,30 @@ git -C "$HOME/.agents/skills/atlas" pull --ff-only
 报告断链、元数据和需要语义审查的问题，暂不修改文件。
 ```
 
-用户明确授权的改动可以直接应用并展示差异；用户要求先审阅时，先交付具体草案。新知识默认 `draft`，允许写入不等于人类已审查技术结论。
+非共享知识的明确授权改动可直接应用并展示差异；用户要求先审阅时，先交付具体草案。**融入 shared 必须先审核具体正文/diff**，不能用一般写入授权跳过。新知识默认 `draft`，允许写入不等于人类已审查技术结论。
+
+## 知识库组织与 Capture 扩展
+
+新库最外层直接使用用户选择的项目/领域与 shared：
+
+```text
+KnowledgeBase/
+├── .atlas/layout.json
+├── compiler-x/             # 项目
+├── llvm/                   # 领域
+└── shared/                 # 内容经用户审核后融入
+```
+
+初始化先建空 shared，其他分区按需注册。每次添加知识先选择归属；已经明确的选择无需重复询问：
+
+```sh
+python scripts/atlas_user.py scopes --kb /absolute/path/to/KnowledgeBase
+python scripts/atlas_user.py scopes --kb /absolute/path/to/KnowledgeBase --add llvm --kind domain
+```
+
+旧 knowledge/projects 布局继续兼容读取，迁移先审阅路径映射，旧 knowledge 不自动变成 shared。详见 [分区规则](references/scopes.md)。
+
+收纳任务使用 [通用 Knowledge Capture prompt](assets/knowledge-capture-prompt.md)，目标是长期知识资产而非摘要，保留机制、条件、关系、参数、证据、失败路径和未知。可从 [场景增量模板](assets/capture-profile.md) 建立知识库 `.atlas/capture-profiles/<name>.md`，在请求或 CONVENTIONS 中明确选择。场景要求独立于 Skill checkout，更新不覆盖；不必改动通用模板。
 
 ## 命令行工具
 
@@ -112,6 +156,8 @@ python scripts/atlas.py validate /absolute/path/to/KnowledgeBase
 python scripts/atlas.py check-links /absolute/path/to/KnowledgeBase
 python scripts/atlas.py audit /absolute/path/to/KnowledgeBase --json
 python scripts/atlas.py build-index /absolute/path/to/KnowledgeBase
+# 从项目目录调用绝对脚本路径时，也可省略 KB 参数使用配置
+python /absolute/path/to/Atlas/scripts/atlas.py audit --json
 ```
 
 `build-index` 只输出 Markdown，不写文件。`--check` 比较已保存 INDEX 是否过期；`--strict` 将警告也视作检查失败。工具不会联网验证来源或自动修复笔记。具体覆盖范围与退出码见 [工具说明](references/tooling.md)。
@@ -123,7 +169,7 @@ SKILL.md              Skill 入口和工作流路由
 agents/               Codex 展示元数据
 references/           知识规范、工作流和使用说明
 assets/               新库与整合计划模板
-scripts/              确定性检查与打包工具
+scripts/              确定性检查、用户配置/升级与打包工具
 tests/                工具回归测试及语义验收情景
 experiments/          开发实验，非正式用户知识库
 ```
@@ -138,7 +184,7 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-目前工具包含 21 项回归测试。独立 LLM 工作流评估及用户真实知识库验收尚待完成，不能把工具测试视作技术知识准确性的认证。详细记录见 [验证说明](references/validation.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+测试覆盖知识检查、配置优先级和临时 Git 远端上的升级保护。独立 LLM 工作流评估及用户真实知识库验收尚待完成，不能把工具测试视作技术知识准确性的认证。详细记录见 [验证说明](references/validation.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 打包与分享
 
@@ -157,6 +203,7 @@ python3 scripts/package_skill.py
 - [Skill 入口](SKILL.md)
 - [知识库规范](references/knowledge-base-spec.md)
 - [使用说明](references/getting-started.md)
+- [全局/项目知识库配置与升级](references/user-management.md)
 - [Review 与 Apply](references/review-apply.md)
 - [语义验收情景](tests/acceptance.md)
 

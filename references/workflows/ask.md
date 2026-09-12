@@ -2,7 +2,7 @@
 
 默认只查指定本地知识库；它可能是草稿或历史记录，不一定正确。
 
-1. 提取用户问题中的术语、缩写、同义词与版本/target。用 `rg --files` 列举 `knowledge/`、`projects/`，先查看 README/overview/已有 INDEX；INDEX 是线索，必须读取实际文档。
+1. 提取用户问题中的术语、缩写、同义词与版本/target。按 [分区规则](../scopes.md) 列出实际注册分区（旧库为 knowledge/projects），用 `rg --files` 优先列举目标分区与 shared，再查看 README/overview/已有 INDEX；INDEX 是线索，必须读取实际文档。用户未限制范围时可检索全库，回答注明归属。
 2. 用 `rg -n -i -F -e <term> -e <alias> <scoped-path>` 检索标题、aliases 和正文。词来自用户输入时使用参数边界，避免当成正则或 shell 代码。扩大到邻近领域一次，不能仅因标签不匹配认定没有知识。
 3. 读取候选文档相关段落、Sources and evidence、status 和适用范围。通过链接补充必要前提；不要只读片段就断言整篇内容。
 4. 回答先给结论，再指向文件与相关标题/行号，说明哪些是资料陈述、观察或推断。冲突时并列给出范围与证据；deprecated 文档先查替代目标。
